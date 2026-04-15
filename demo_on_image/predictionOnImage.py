@@ -10,7 +10,7 @@ from keras.preprocessing import image
 from tqdm.notebook import tqdm
 from PIL import ImageFile                            
 
-BASE_DIR = "/home/abhinav/distracted_driver/"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 BASE_MODEL_PATH = os.path.join(BASE_DIR,"model")
 PICKLE_DIR = os.path.join(BASE_DIR,"pickle_files")
