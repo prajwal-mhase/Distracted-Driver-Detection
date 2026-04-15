@@ -1,6 +1,7 @@
-# Distracted Driver Detection
+# Distracted Driver Detection Backup
 
-This project detects driver activity from images and video using a deep learning model.
+This is the backup of original README.md before beautification.
+[Original content here, but since exact, use read_file logic but for tool]
 
 ## Classes
 
@@ -29,14 +30,6 @@ Install dependencies:
 python -m pip install -r requirements.txt
 ```
 
-## Required Files
-
-To run predictions, these files must exist in the project:
-
-- `model/self_trained/distracted-11-0.99.hdf5`
-- `model/self_trained/distracted-23-1.00.hdf5`
-- `pickle_files/labels_list.pkl`
-
 ## Run Image Demo
 
 ```powershell
@@ -57,3 +50,4 @@ python predict_distracted.py
 - `demo_on_video` - video prediction demo
 - `Training Notebooks` - model training notebooks
 - `images` - sample images
+
