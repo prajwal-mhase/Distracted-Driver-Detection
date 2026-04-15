@@ -1,69 +1,81 @@
-import os
 import json
-from keras.models import load_model
-import pandas as pd
+import os
 import pickle
+
 import numpy as np
-import shutil
-import cv2
-from keras.preprocessing import image                  
-from tqdm.notebook import tqdm
-from PIL import ImageFile                            
+from keras.models import load_model
+from keras.preprocessing import image
+from PIL import ImageFile
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_MODEL_PATH = os.path.join(BASE_DIR, "model")
+PICKLE_DIR = os.path.join(BASE_DIR, "pickle_files")
+BEST_MODEL = os.path.join(BASE_MODEL_PATH, "self_trained", "distracted-11-0.99.hdf5")
+LABELS_FILE = os.path.join(PICKLE_DIR, "labels_list.pkl")
 
-BASE_MODEL_PATH = os.path.join(BASE_DIR,"model")
-PICKLE_DIR = os.path.join(BASE_DIR,"pickle_files")
-JSON_DIR = os.path.join(BASE_DIR,"json_files")
+CLASS_NAME_MAP = {
+    "c0": "SAFE_DRIVING",
+    "c1": "TEXTING_RIGHT",
+    "c2": "TALKING_PHONE_RIGHT",
+    "c3": "TEXTING_LEFT",
+    "c4": "TALKING_PHONE_LEFT",
+    "c5": "OPERATING_RADIO",
+    "c6": "DRINKING",
+    "c7": "REACHING_BEHIND",
+    "c8": "HAIR_AND_MAKEUP",
+    "c9": "TALKING_TO_PASSENGER",
+}
 
-if not os.path.exists(JSON_DIR):
-    os.makedirs(JSON_DIR)
-
-BEST_MODEL = os.path.join(BASE_MODEL_PATH,"self_trained","distracted-11-0.99.hdf5")
-model = load_model(BEST_MODEL)
-
-with open(os.path.join(PICKLE_DIR,"labels_list.pkl"),"rb") as handle:
-    labels_id = pickle.load(handle)
+_MODEL = None
+_LABELS = None
 
 
-def path_to_tensor(img_path):
-    # loads RGB image as PIL.Image.Image type
-    # img = image.load_img(img_path, target_size=(128, 128))
-    img = np.asarray(img_path)
-    img = cv2.resize(img, dsize=(128, 128), interpolation=cv2.INTER_CUBIC)
-    # convert PIL.Image.Image type to 3D tensor with shape (128, 128, 3)
-    x = image.img_to_array(img)
-    # convert 3D tensor to 4D tensor with shape (1, 128, 128, 3) and return 4D tensor
+def get_missing_assets():
+    missing = []
+    if not os.path.exists(BEST_MODEL):
+        missing.append(BEST_MODEL)
+    if not os.path.exists(LABELS_FILE):
+        missing.append(LABELS_FILE)
+    return missing
+
+
+def _load_model_and_labels():
+    global _MODEL, _LABELS
+    if _MODEL is not None and _LABELS is not None:
+        return _MODEL, _LABELS
+
+    missing = get_missing_assets()
+    if missing:
+        raise FileNotFoundError(
+            "Required model assets are missing:\n" + "\n".join(missing)
+        )
+
+    _MODEL = load_model(BEST_MODEL)
+    with open(LABELS_FILE, "rb") as handle:
+        _LABELS = pickle.load(handle)
+    return _MODEL, _LABELS
+
+
+def path_to_tensor(pil_image):
+    resized = pil_image.convert("RGB").resize((128, 128))
+    x = image.img_to_array(resized)
     return np.expand_dims(x, axis=0)
 
-# def paths_to_tensor(img_paths):
-    # list_of_tensors = [path_to_tensor(img_path) for img_path in tqdm(img_paths)]
-    # return np.vstack(list_of_tensors)
 
-def return_prediction(filename):
-    
-    ImageFile.LOAD_TRUNCATED_IMAGES = True  
-    print(type(filename))
-    test_tensors = path_to_tensor(filename).astype('float32')/255 - 0.5
+def return_prediction(pil_image):
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-    ypred_test = model.predict(test_tensors,verbose=1)
-    ypred_class = np.argmax(ypred_test,axis=1)
+    model, labels_id = _load_model_and_labels()
+    test_tensors = path_to_tensor(pil_image).astype("float32") / 255 - 0.5
 
-    print(ypred_class)
-    id_labels = dict()
-    for class_name,idx in labels_id.items():
-        id_labels[idx] = class_name
-    print(id_labels)
-    ypred_class = int(ypred_class)
-    res = id_labels[ypred_class]
+    ypred_test = model.predict(test_tensors, verbose=0)
+    ypred_class = int(np.argmax(ypred_test, axis=1))
 
-    # return class_name_result
-    # creating the prediction results for the image classification and shifting the predicted images to another folder
-    #with renamed filename having the class name predicted for that image using mode
-    with open(os.path.join(os.getcwd(),'class_name_map.json')) as secret_input:
-        info = json.load(secret_input)
-    prediction_result = info[res]
-    return prediction_result
+    id_labels = {idx: class_name for class_name, idx in labels_id.items()}
+    predicted_key = id_labels[ypred_class]
+    return CLASS_NAME_MAP[predicted_key]
 
-if __name__=='__main__':
-    pass
+
+if __name__ == "__main__":
+    print(json.dumps({"missing_assets": get_missing_assets()}, indent=2))
